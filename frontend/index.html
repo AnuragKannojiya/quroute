@@ -1,0 +1,244 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>QuRoute — Quantum Route Optimizer</title>
+
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+  <aside id="sidebar" class="sidebar">
+    <div class="sidebar-header">
+      <div class="logo">
+        <svg class="logo-mark" viewBox="0 0 28 28" width="24" height="24" fill="none">
+          <circle cx="14" cy="14" r="12" stroke="currentColor" stroke-width="1.2" opacity="0.25"/>
+          <circle cx="14" cy="14" r="5" stroke="currentColor" stroke-width="1.2"/>
+          <circle cx="14" cy="8" r="2.2" fill="currentColor"/>
+          <circle cx="19" cy="17.5" r="2.2" fill="currentColor"/>
+          <circle cx="9" cy="17.5" r="2.2" fill="currentColor"/>
+          <line x1="14" y1="10.2" x2="17.8" y2="15.8" stroke="currentColor" stroke-width="0.8"/>
+          <line x1="14" y1="10.2" x2="10.2" y2="15.8" stroke="currentColor" stroke-width="0.8"/>
+          <line x1="10.5" y1="16" x2="17.5" y2="16" stroke="currentColor" stroke-width="0.8"/>
+        </svg>
+        <div>
+          <span class="logo-text">QuRoute</span>
+          <span class="logo-sub">Quantum Route Optimizer</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Compute Mode -->
+    <div class="sidebar-section">
+      <div class="section-label">Compute Backend</div>
+      <div class="toggle-row">
+        <button class="seg-btn active" data-mode="simulator" id="mode-sim">Simulator</button>
+        <button class="seg-btn" data-mode="qpu" id="mode-qpu">IBM Quantum</button>
+      </div>
+      <div id="qpu-info" class="qpu-info hidden">
+        <span class="qpu-chip"></span>
+        ibm_fez · 156 qubits
+      </div>
+    </div>
+
+    <!-- Vehicle Config -->
+    <div class="sidebar-section">
+      <div class="section-label">Vehicles</div>
+      <div class="toggle-row">
+        <button class="seg-btn active" data-vehicles="1">1</button>
+        <button class="seg-btn" data-vehicles="2">2</button>
+        <button class="seg-btn" data-vehicles="3">3</button>
+      </div>
+    </div>
+
+    <!-- Demo -->
+    <div class="sidebar-section">
+      <button id="btn-load-demo" class="btn btn-ghost">
+        <svg width="13" height="13" viewBox="0 0 16 16" fill="currentColor"><path d="M8 0a5 5 0 0 0-5 5c0 3.5 5 9.5 5 9.5s5-6 5-9.5a5 5 0 0 0-5-5zm0 7a2 2 0 1 1 0-4 2 2 0 0 1 0 4z"/></svg>
+        Load Vijayawada Demo
+      </button>
+    </div>
+
+    <!-- Stops -->
+    <div class="sidebar-section sidebar-stops">
+      <div class="section-label">
+        <span>Stops</span>
+        <span class="counter" id="stop-count-text">0/8</span>
+      </div>
+      <div id="stop-list" class="stop-list">
+        <p class="stop-list-empty">Click the map to place delivery stops</p>
+      </div>
+    </div>
+
+    <!-- Actions -->
+    <div class="sidebar-section sidebar-actions">
+      <button id="btn-optimize" class="btn btn-primary" disabled>
+        Optimize Routes
+      </button>
+      <div id="loading-spinner" class="spinner hidden">
+        <div class="spinner-ring"></div>
+        <span>Computing optimal route…</span>
+      </div>
+    </div>
+
+    <!-- Animation Controls (shown after optimization) -->
+    <div id="anim-controls" class="sidebar-section anim-controls hidden">
+      <div class="section-label">Route Playback</div>
+      <div class="anim-row">
+        <button id="btn-play" class="btn-icon" title="Play animation">
+          <svg id="play-icon" width="16" height="16" viewBox="0 0 16 16" fill="currentColor"><path d="M4 2l10 6-10 6z"/></svg>
+          <svg id="pause-icon" width="16" height="16" viewBox="0 0 16 16" fill="currentColor" class="hidden"><rect x="3" y="2" width="4" height="12"/><rect x="9" y="2" width="4" height="12"/></svg>
+        </button>
+        <div class="anim-track">
+          <div id="anim-progress" class="anim-fill" style="width:0%"></div>
+        </div>
+        <button id="btn-reset" class="btn-icon" title="Reset">
+          <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor"><path d="M2 2v5h5V5.5H4.09A5.5 5.5 0 1 1 2.5 8H1a7 7 0 1 0 2.18-5H2V2z"/></svg>
+        </button>
+      </div>
+    </div>
+
+    <div id="cached-indicator" class="cached-indicator hidden">
+      Showing cached result — not a live computation
+    </div>
+
+    <div class="sidebar-footer">
+      <span>QuHack 2026</span>
+      <span class="dot">·</span>
+      <span>UC-038</span>
+    </div>
+  </aside>
+
+  <main id="map-container">
+    <div id="map"></div>
+  </main>
+
+  <!-- Right Panel -->
+  <aside id="metrics-panel" class="metrics-panel hidden">
+    <div class="metrics-header">
+      <h2>Results</h2>
+      <button id="btn-close-metrics" class="btn-close" title="Close">
+        <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor"><path d="M4.646 4.646a.5.5 0 0 1 .708 0L8 7.293l2.646-2.647a.5.5 0 0 1 .708.708L8.707 8l2.647 2.646a.5.5 0 0 1-.708.708L8 8.707l-2.646 2.647a.5.5 0 0 1-.708-.708L7.293 8 4.646 5.354a.5.5 0 0 1 0-.708z"/></svg>
+      </button>
+    </div>
+
+    <div id="metrics-content" class="metrics-content">
+      <div id="live-badge" class="live-badge">Live · Simulator</div>
+
+      <!-- Route Costs -->
+      <div class="metric-group">
+        <div class="section-label">Route Cost</div>
+        <div class="route-row qaoa">
+          <div class="route-dot"></div>
+          <span class="route-name">QAOA</span>
+          <span class="route-val mono" id="metric-qaoa-cost">—</span>
+        </div>
+        <div class="route-row greedy">
+          <div class="route-dot"></div>
+          <span class="route-name">Greedy</span>
+          <span class="route-val mono" id="metric-greedy-cost">—</span>
+        </div>
+        <div class="route-row optimal">
+          <div class="route-dot"></div>
+          <span class="route-name">Optimal</span>
+          <span class="route-val mono" id="metric-optimal-cost">—</span>
+        </div>
+      </div>
+
+      <!-- Performance -->
+      <div class="metric-group">
+        <div class="section-label">Performance</div>
+        <div class="kpi-row">
+          <div class="kpi">
+            <div class="kpi-label">vs Greedy</div>
+            <div class="kpi-value" id="metric-improvement">—</div>
+          </div>
+          <div class="kpi">
+            <div class="kpi-label">Opt. Gap</div>
+            <div class="kpi-value" id="metric-gap">—</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Circuit -->
+      <div class="metric-group">
+        <div class="section-label">Quantum Circuit</div>
+        <div class="kpi-row thirds">
+          <div class="kpi">
+            <div class="kpi-label">Qubits</div>
+            <div class="kpi-value mono" id="metric-qubits">—</div>
+          </div>
+          <div class="kpi">
+            <div class="kpi-label">Depth</div>
+            <div class="kpi-value mono" id="metric-depth">—</div>
+          </div>
+          <div class="kpi">
+            <div class="kpi-label">Valid</div>
+            <div class="kpi-value mono" id="metric-valid-rate">—</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Env Impact -->
+      <div class="metric-group">
+        <div class="section-label">Environmental</div>
+        <div class="kpi-row">
+          <div class="kpi">
+            <div class="kpi-label">Fuel</div>
+            <div class="kpi-value mono" id="metric-fuel">—</div>
+          </div>
+          <div class="kpi">
+            <div class="kpi-label">CO₂</div>
+            <div class="kpi-value mono" id="metric-co2">—</div>
+          </div>
+        </div>
+        <div class="kpi-row" style="margin-top:4px">
+          <div class="kpi highlight">
+            <div class="kpi-label">Fuel Saved</div>
+            <div class="kpi-value" id="metric-fuel-saved">—</div>
+          </div>
+          <div class="kpi highlight">
+            <div class="kpi-label">CO₂ Saved</div>
+            <div class="kpi-value" id="metric-co2-saved">—</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Vehicle Breakdown (multi-vehicle) -->
+      <div id="vehicle-breakdown" class="metric-group hidden">
+        <div class="section-label">Vehicle Breakdown</div>
+        <div id="vehicle-details"></div>
+      </div>
+
+      <!-- Chart -->
+      <div class="metric-group">
+        <div class="section-label">Comparison</div>
+        <div class="chart-box">
+          <canvas id="cost-chart"></canvas>
+        </div>
+      </div>
+
+      <p class="footnote">
+        Fuel ~0.3 L/km · CO₂ ~2.68 kg/L · Haversine distances
+      </p>
+    </div>
+  </aside>
+
+  <!-- Label popup -->
+  <div id="label-popup" class="label-popup hidden">
+    <input type="text" id="label-input" placeholder="Name this stop…" maxlength="30">
+    <button id="btn-add-label" class="btn btn-sm">Add</button>
+  </div>
+
+  <script src="map.js"></script>
+  <script src="metrics-panel.js"></script>
+</body>
+</html>
