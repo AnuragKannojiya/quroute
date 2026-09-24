@@ -2,7 +2,8 @@
  * QuRoute Map — stops, routes, multi-vehicle, animation, QPU toggle.
  */
 
-const BACKEND_URL = '';
+// Auto-detect backend URL: allows deploying frontend anywhere and pointing to Render backend
+const BACKEND_URL = window.QURoute_BACKEND_URL || localStorage.getItem('quroute_backend') || '';
 const MAX_STOPS = 8;
 
 const VEHICLE_COLORS = ['#34d399', '#6fa3ec', '#ec6fa0'];

@@ -1,0 +1,44 @@
+# Render.com Blueprint — deploys all 3 QuRoute services for free
+
+services:
+  # Quantum Service (Python/FastAPI)
+  - type: web
+    name: quroute-quantum
+    runtime: docker
+    dockerfilePath: quantum-service/Dockerfile
+    dockerContext: quantum-service
+    plan: free
+    envVars:
+      - key: PORT
+        value: 8001
+    healthCheckPath: /health
+
+  # Backend (Node.js/Express)
+  - type: web
+    name: quroute-backend
+    runtime: docker
+    dockerfilePath: backend/Dockerfile
+    dockerContext: backend
+    plan: free
+    envVars:
+      - key: PORT
+        value: 3000
+      - key: QUANTUM_SERVICE_URL
+        fromService:
+          name: quroute-quantum
+          type: web
+          property: hostport
+      - key: CORS_ORIGIN
+        value: "*"
+    healthCheckPath: /health
+
+  # Frontend (Static Site)
+  - type: web
+    name: quroute-frontend
+    runtime: static
+    buildCommand: echo "No build needed"
+    staticPublishPath: frontend
+    headers:
+      - path: /*
+        name: Cache-Control
+        value: no-cache
